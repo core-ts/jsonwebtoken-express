@@ -1,7 +1,7 @@
 {
-  "name": "express-jsonwebtoken",
+  "name": "jsonwebtoken-express",
   "version": "0.0.1",
-  "description": "express-jsonwebtoken",
+  "description": "jsonwebtoken-express",
   "main": "./lib/index.js",
   "types": "./src/index.ts",
   "scripts": {
@@ -23,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com/core-ts/express-jsonwebtoken"
+    "url": "git@github.com/core-ts/jsonwebtoken-express"
   },
   "keywords": [
     "express"
