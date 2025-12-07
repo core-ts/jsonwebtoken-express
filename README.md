@@ -1,1 +1,1 @@
-# express-jsonwebtoken
+# jsonwebtoken-express
