@@ -2,14 +2,22 @@ import { NextFunction, Request, Response } from "express"
 import { sign, verify } from "jsonwebtoken"
 
 export class TokenVerifier {
+  protected username: string
+  protected payloadUsername: string
   constructor(
-    private account: string,
-    private token: string,
-    private secret: string,
-    private expiresIn: number,
-    private remember: string,
-    private rememberSecret: string,
+    protected account: string,
+    protected userId: string,
+    protected payloadId: string,
+    protected token: string,
+    protected secret: string,
+    protected expiresIn: number,
+    protected remember: string,
+    protected rememberSecret: string,
+    username?: string,
+    payloadUsername?: string,
   ) {
+    this.username = username ? username : "username"
+    this.payloadUsername = payloadUsername ? payloadUsername : "username"
     this.verify = this.verify.bind(this)
   }
 
@@ -32,9 +40,9 @@ export class TokenVerifier {
             const newToken = sign(decoded2, this.secret, { expiresIn: this.expiresIn })
             res.cookie(this.token, newToken, { httpOnly: true, secure: true, sameSite: "lax", maxAge: this.expiresIn })
             res.locals[this.account] = decoded2
-            res.locals.userId = decoded2.id
-            if (decoded2.username) {
-              res.locals.username = decoded2.username
+            res.locals[this.userId] = decoded2[this.payloadId]
+            if (decoded2[this.username]) {
+              res.locals[this.username] = decoded2[this.payloadUsername]
             }
             next()
           }
@@ -54,19 +62,20 @@ export class TokenVerifier {
                 const newToken = sign(decoded2, this.secret, { expiresIn: this.expiresIn })
                 res.cookie(this.token, newToken, { httpOnly: true, secure: true, sameSite: "lax", maxAge: this.expiresIn })
                 res.locals[this.account] = decoded2
-                res.locals.userId = decoded2.id
-                if (decoded2.username) {
-                  res.locals.username = decoded2.username
+                res.locals[this.userId] = decoded2[this.payloadId]
+                if (decoded2[this.username]) {
+                  res.locals[this.username] = decoded2[this.payloadUsername]
                 }
                 next()
               }
             })
           }
         } else {
+          removeJWTFields(decoded)
           res.locals[this.account] = decoded
-          res.locals.userId = decoded.id
-          if (decoded.username) {
-            res.locals.username = decoded.username
+          res.locals[this.userId] = decoded[this.payloadId]
+          if (decoded[this.username]) {
+            res.locals[this.username] = decoded[this.payloadUsername]
           }
           next()
         }
@@ -74,8 +83,7 @@ export class TokenVerifier {
     }
   }
 }
-
-function removeJWTFields(obj: any) {
+export function removeJWTFields(obj: any) {
   delete obj.iat
   delete obj.exp
 }
