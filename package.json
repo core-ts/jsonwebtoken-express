@@ -1,6 +1,6 @@
 {
   "name": "jsonwebtoken-express",
-  "version": "0.0.6",
+  "version": "0.1.0",
   "description": "jsonwebtoken-express",
   "main": "./lib/index.js",
   "types": "./src/index.ts",

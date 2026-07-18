@@ -1,393 +1,31 @@
 # jsonwebtoken-express
 
-Express middleware for JWT authentication with automatic access token refresh using remember tokens.
+A lightweight Express middleware library for JWT authentication using cookies.
 
-Unlike low-level JWT libraries, **jsonwebtoken-express** provides ready-to-use Express middleware that:
+Unlike full authentication frameworks, **jsonwebtoken-express** focuses on one job: verifying JWTs and exposing authenticated users through `res.locals`.
 
-- Verifies access tokens
-- Supports optional authentication
-- Protects authenticated routes
-- Automatically refreshes expired access tokens using remember tokens
-- Stores authenticated user information in `res.locals`
-- Uses secure HTTP-only cookies
+It provides:
 
-## Features
-
-- ✔ Optional authentication middleware
-- ✔ Required authentication middleware
-- ✔ Automatic access token renewal
-- ✔ Remember Me support
-- ✔ HTTP-only secure cookies
-- ✔ Configurable cookie names
-- ✔ Configurable payload field mapping
-- ✔ Stores authenticated account in `res.locals`
-- ✔ TypeScript support
-- ✔ Lightweight with minimal dependencies
-
----
-
-## Installation
-
-```bash
-npm install jsonwebtoken-express
-```
-
----
-
-## Requirements
-
-This library expects:
-
-- Express
-- cookie-parser
-- jsonwebtoken
-
-```bash
-npm install express cookie-parser jsonwebtoken
-```
-
----
-
-## Quick Start
-
-```ts
-import express from "express"
-import cookieParser from "cookie-parser"
-import { TokenVerifier } from "jsonwebtoken-express"
-
-const app = express()
-
-app.use(cookieParser())
-
-app.use(new TokenVerifier(
-    "account",
-    "userId",
-    "id",
-    "accessToken",
-    "ACCESS_SECRET",
-    1000 * 60 * 15,
-    "lax",
-    "rememberToken",
-    "REMEMBER_SECRET"
-).verify)
-```
-
----
-
-# Middleware
-
-The library provides two middleware classes.
-
-| Middleware | Authentication Required |
-|------------|-------------------------|
-| TokenVerifier | No |
-| AuthenticationVerifier | Yes |
-
----
-
-# TokenVerifier
-
-`TokenVerifier` performs optional authentication.
-
-Behavior:
-
-- Valid access token → user is authenticated.
-- Expired access token + valid remember token → generates a new access token.
-- No tokens → request continues anonymously.
-- Invalid tokens → request continues anonymously.
-
-Example:
-
-```ts
-app.use(new TokenVerifier(
-    "account",
-    "userId",
-    "id",
-    "accessToken",
-    process.env.ACCESS_SECRET!,
-    1000 * 60 * 15,
-    "lax",
-    "rememberToken",
-    process.env.REMEMBER_SECRET!
-).verify)
-```
-
-This middleware is useful for:
-
-- Public APIs
-- Home pages
-- Product pages
-- Optional login
-
----
-
-# AuthenticationVerifier
-
-`AuthenticationVerifier` requires authentication.
-
-Behavior:
-
-- Valid access token → continue.
-- Expired access token + valid remember token → automatically issues a new access token.
-- Missing tokens → HTTP 401.
-- Invalid tokens → HTTP 401.
-- Unexpected errors → HTTP 500.
-
-Example:
-
-```ts
-app.get(
-    "/profile",
-    new AuthenticationVerifier(
-        "account",
-        "userId",
-        "id",
-        "accessToken",
-        process.env.ACCESS_SECRET!,
-        1000 * 60 * 15,
-        "lax",
-        "rememberToken",
-        process.env.REMEMBER_SECRET!,
-        console.error
-    ).verify,
-    (req, res) => {
-        res.json(res.locals.account)
-    }
-)
-```
-
----
-
-# Automatic Token Refresh
-
-One of the primary features of this library is automatic access token renewal.
-
-```
-Request
-      │
-      ▼
-Access Token
-      │
-      ├── Valid
-      │      │
-      │      ▼
-      │   Continue
-      │
-      └── Expired
-             │
-             ▼
-      Remember Token
-             │
-      ├── Valid
-      │      │
-      │      ▼
-      │ Generate New Access Token
-      │      │
-      │      ▼
-      │ Continue Request
-      │
-      └── Invalid
-             │
-             ▼
-          401 Unauthorized
-```
-
-The user stays logged in without manually signing in again.
-
----
-
-# res.locals
-
-After successful authentication, the middleware stores the authenticated user inside `res.locals`.
-
-Example:
-
-```ts
-res.locals.account
-res.locals.userId
-```
-
-You can access these values from any subsequent middleware or route handler.
-
----
-
-# Payload Mapping
-
-Your JWT payload does not have to match the property names used inside Express.
-
-For example:
-
-JWT
-
-```json
-{
-    "id": 123,
-    "email": "john@example.com"
-}
-```
-
-Middleware
-
-```ts
-new AuthenticationVerifier(
-    "account",
-    "userId",
-    "id",
-    "accessToken",
-    ACCESS_SECRET,
-    900000,
-    "lax",
-    "rememberToken",
-    REMEMBER_SECRET,
-    console.error,
-    "email",
-    "email"
-)
-```
-
-Result:
-
-```ts
-res.locals.account
-res.locals.userId
-res.locals.email
-```
-
----
-
-# Cookie Options
-
-The generated access token is stored as an HTTP-only cookie.
-
-```ts
-{
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax"
-}
-```
-
-The cookie lifetime is determined by the configured expiration time.
-
----
-
-# Error Responses
-
-AuthenticationVerifier returns standard HTTP responses.
-
-| Status | Description |
-|---------|-------------|
-| 401 | Missing access token |
-| 401 | Invalid remember token |
-| 401 | Remember token expired |
-| 500 | Unexpected internal error |
-
----
-
-# API
-
-## TokenVerifier
-
-```ts
-new TokenVerifier(
-    account,
-    userId,
-    payloadId,
-    accessToken,
-    accessSecret,
-    expiresIn,
-    sameSite,
-    rememberToken,
-    rememberSecret,
-    username?,
-    payloadUsername?
-)
-```
-
----
-
-## AuthenticationVerifier
-
-```ts
-new AuthenticationVerifier(
-    account,
-    userId,
-    payloadId,
-    accessToken,
-    accessSecret,
-    expiresIn,
-    sameSite,
-    rememberToken,
-    rememberSecret,
-    log,
-    username?,
-    payloadUsername?
-)
-```
-
----
-
-# Example
-
-```ts
-app.get(
-    "/me",
-    authentication.verify,
-    (req, res) => {
-        res.json({
-            user: res.locals.account
-        })
-    }
-)
-```
-
----
-
-# Use Cases
-
-- REST APIs
-- Express applications
-- Server-side rendered applications
-- Admin dashboards
-- Internal business systems
-- Authentication middleware
+- Optional authentication middleware
+- Required authentication middleware
+- Refresh token endpoint
 - Cookie-based JWT authentication
+- Fully configurable payload mapping
 
----
-
-# License
-
-MIT
-
-
-
-
-# jsonwebtoken-express
-
-Express middleware for JWT authentication with automatic access token renewal.
-
-`jsonwebtoken-express` is a lightweight Express middleware built on top of **Express** and **jsonwebtoken**. It verifies JWT access tokens stored in HTTP cookies, automatically renews expired access tokens using a remember token, and exposes the authenticated account through `res.locals`.
-
-The library is designed primarily for **Server-Side Rendering (SSR)** applications where authentication is performed before rendering pages.
-
-Unlike complete authentication frameworks, `jsonwebtoken-express` intentionally focuses only on the **HTTP layer**. Authentication policies such as password verification, account lockout, password expiration, and two-factor authentication belong to **authen-service** or another authentication domain library.
+No Passport. No decorators. No unnecessary abstractions.
 
 ---
 
 ## Features
 
-- 🔐 JWT authentication middleware
-- 🍪 Cookie-based authentication
-- 🔄 Automatic access token renewal
-- 🧠 Remember token support
-- 🚀 Designed for Server-Side Rendering (SSR)
-- 🔌 Built for Express
-- 🛡 Secure cookie defaults
-- ⚙️ Configurable cookie names
-- ⚙️ Configurable JWT payload fields
-- ⚙️ Configurable SameSite policy
-- 📝 Stores authenticated account in `res.locals`
-- 🎯 Lightweight and framework-focused
+- ✅ Cookie-based JWT authentication
+- ✅ Optional authentication middleware
+- ✅ Required authentication middleware
+- ✅ Refresh access token using a remember token
+- ✅ Stores authenticated user in `res.locals`
+- ✅ Configurable payload field names
+- ✅ Minimal dependencies
+- ✅ TypeScript support
 
 ---
 
@@ -400,182 +38,188 @@ npm install jsonwebtoken-express
 or
 
 ```bash
-yarn add jsonwebtoken-express
+yarn add authen-express
 ```
 
 ---
 
-## Philosophy
+## Requirements
 
-`jsonwebtoken-express` handles **HTTP authentication**, not **business authentication**.
+This library depends on:
 
-```
-    HTTP Request
-         │
-         ▼
-    JWT Cookie
-         │
-         ▼
- jsonwebtoken-express
-         │
-         ▼
-  Authenticated User
-         │
-         ▼
-     Controller
-```
+- express
+- jsonwebtoken
+- cookie-parser
 
-Business authentication should be delegated to libraries such as **authen-service**.
-
-Examples include:
-
-- Username/password verification
-- Password expiration
-- Account lockout
-- Two-factor authentication
-- Privilege loading
-- Authentication policies
-
-Keeping these responsibilities separate follows the principles of Clean Architecture.
-
----
-
-## Architecture
-
-```
-   Express Request
-          │
-          ▼
-  jsonwebtoken-express
-    (JWT + Cookies)
-          │
-          ▼
-    authen-service
-(Authentication Domain)
-          │
-          ▼
-     Application
-          │
-          ▼
-       Database
-```
-
----
-
-## Quick Start
+Enable cookie parsing before using the middleware.
 
 ```typescript
 import express from "express";
 import cookieParser from "cookie-parser";
-import { TokenVerifier } from "jsonwebtoken-express";
 
 const app = express();
 
 app.use(cookieParser());
+```
+
+---
+
+## Optional Authentication
+
+`TokenVerifier` attempts to authenticate the current request.
+
+If the access token does not exist or is invalid, the request continues normally.
+
+```typescript
+import { TokenVerifier } from "jsonwebtoken-express";
 
 const verifier = new TokenVerifier(
     "account",
     "userId",
     "id",
-    "access_token",
-    process.env.ACCESS_SECRET!,
-    15 * 60 * 1000,
-    "lax",
-    "remember_token",
-    process.env.REMEMBER_SECRET!
+    "accessToken",
+    process.env.ACCESS_SECRET!
 );
 
 app.use(verifier.verify);
+```
 
-app.get("/profile", (req, res) => {
-    if (!res.locals.account) {
-        return res.status(401).send("Unauthorized");
-    }
+After successful verification:
 
+```typescript
+res.locals.account;
+res.locals.userId;
+```
+
+If no valid access token exists, the request simply continues without authentication.
+
+---
+
+## Required Authentication
+
+`AuthenticationVerifier` requires a valid access token.
+
+```typescript
+import { AuthenticationVerifier } from "jsonwebtoken-express";
+
+const auth = new AuthenticationVerifier(
+    "account",
+    "userId",
+    "id",
+    "accessToken",
+    process.env.ACCESS_SECRET!,
+    console.error
+);
+
+app.get("/profile", auth.verify, (req, res) => {
     res.json(res.locals.account);
 });
 ```
 
+Possible responses:
+
+| Status | Description |
+|--------|-------------|
+| 401 | Access token missing |
+| 401 | Access token expired |
+| 401 | Invalid access token |
+| 500 | Internal verification error |
+
 ---
 
-## Authentication Flow
+## Refresh Access Token
 
+`TokenController` creates a new access token using a valid remember token.
+
+```typescript
+import { TokenController } from "jsonwebtoken-express";
+
+const controller = new TokenController(
+    "accessToken",
+    process.env.ACCESS_SECRET!,
+    3600000,
+    "lax",
+    "rememberToken",
+    process.env.REMEMBER_SECRET!,
+    console.error
+);
+
+app.post("/refresh", controller.refresh);
 ```
-Request
-   │
-   ▼
-Access Token
-   │
-   ▼
-Valid?
-   ├── Yes
-   │    │
-   │    ▼
-   │  User Available
-   │
-   └── No
-       │
-       ▼
- Remember Token
-       │
-       ▼
-     Valid?
-       ├── No
-       │
-       │  Continue as Guest
-       │
-       └── Yes
-            │
-            ▼
+
+Refresh workflow:
+
+```text
+Remember Token Cookie
+          │
+          ▼
+ Verify JWT
+          │
+          ▼
  Generate New Access Token
-            │
-            ▼
-      Update Cookie
-            │
-            ▼
-     Continue Request
+          │
+          ▼
+ Set Access Token Cookie
+          │
+          ▼
+      HTTP 200
 ```
 
 ---
 
-## Automatic Access Token Renewal
+## Accessing the Authenticated User
 
-When an access token has expired:
-
-1. Verify the remember token.
-2. Generate a new access token.
-3. Store the new access token in a secure HTTP-only cookie.
-4. Continue processing the request.
-
-No additional refresh endpoint is required for SSR applications.
-
----
-
-## Middleware Result
-
-After successful verification, the middleware stores the authenticated information in `res.locals`.
+After successful authentication:
 
 ```typescript
-res.locals.account
-res.locals.userId
-res.locals.username
+res.locals.account;
+res.locals.userId;
 ```
 
-Example:
+These values remain available throughout the request lifecycle.
+
+---
+
+## Custom Payload Mapping
+
+Suppose your JWT payload is:
+
+```json
+{
+  "user_id": 123,
+  "email": "john@example.com"
+}
+```
+
+Configure custom payload field names:
 
 ```typescript
-app.get("/me", (req, res) => {
-    res.json({
-        account: res.locals.account,
-        userId: res.locals.userId,
-        username: res.locals.username
-    });
-});
+const verifier = new TokenVerifier(
+    "account",
+    "userId",
+    "user_id",
+    "accessToken",
+    process.env.ACCESS_SECRET!,
+    "email",
+    "email"
+);
+```
+
+Then:
+
+```typescript
+res.locals.account;
+res.locals.userId;
+res.locals.email;
 ```
 
 ---
 
-## Constructor
+## API
+
+### TokenVerifier
+
+Optional authentication middleware.
 
 ```typescript
 new TokenVerifier(
@@ -584,143 +228,94 @@ new TokenVerifier(
     payloadId,
     accessToken,
     accessSecret,
-    expiresIn,
-    sameSite,
-    rememberToken,
-    rememberSecret,
     username?,
     payloadUsername?
-)
+);
 ```
 
 | Parameter | Description |
 |-----------|-------------|
-| `account` | Property name used to store the authenticated account in `res.locals` |
-| `userId` | Property name used to store the authenticated user ID |
-| `payloadId` | JWT payload field containing the user identifier |
-| `accessToken` | Access token cookie name |
-| `accessSecret` | Secret used to verify access tokens |
-| `expiresIn` | Lifetime of newly generated access tokens |
-| `sameSite` | Cookie SameSite policy (`lax`, `strict`, or `none`) |
-| `rememberToken` | Remember token cookie name |
-| `rememberSecret` | Secret used to verify remember tokens |
-| `username` | Optional property name stored in `res.locals` |
-| `payloadUsername` | Username field inside the JWT payload |
+| account | Key used to store the decoded JWT payload in `res.locals` |
+| userId | Key used to store the authenticated user's identifier |
+| payloadId | Field name inside the JWT payload containing the user ID |
+| accessToken | Cookie name containing the access token |
+| accessSecret | Secret used to verify the access token |
+| username | *(Optional)* Key used in `res.locals` for the username |
+| payloadUsername | *(Optional)* Username field inside the JWT payload |
 
 ---
 
-## Cookie Configuration
+### AuthenticationVerifier
 
-New access tokens are stored using secure defaults.
+Required authentication middleware.
 
 ```typescript
-{
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax"
-}
+new AuthenticationVerifier(
+    account,
+    userId,
+    payloadId,
+    accessToken,
+    accessSecret,
+    logger,
+    username?,
+    payloadUsername?
+);
 ```
 
-The SameSite policy is configurable through the constructor.
+Parameters are identical to `TokenVerifier`, with an additional logger function.
 
 ---
 
-## Server-Side Rendering (SSR)
+### TokenController
 
-`jsonwebtoken-express` is designed primarily for server-side rendered applications.
+Refresh access tokens.
 
-Typical request lifecycle:
-
-```
-      Browser
-
-         ↓
-
-    HTTP Cookies
-
-         ↓
-
- Express Middleware
-
-         ↓
-
-  JWT Verification
-
-         ↓
-
-Authenticated Account
-
-         ↓
-
-Server-side Rendering
+```typescript
+new TokenController(
+    accessToken,
+    accessSecret,
+    expiresIn,
+    sameSite,
+    rememberToken,
+    rememberSecret,
+    logger
+);
 ```
 
-The controller or template always receives the authenticated account through `res.locals`.
+| Parameter | Description |
+|-----------|-------------|
+| accessToken | Access token cookie name |
+| accessSecret | Secret used to sign access tokens |
+| expiresIn | Access token expiration time |
+| sameSite | Cookie SameSite policy (`lax`, `strict`, or `none`) |
+| rememberToken | Remember token cookie name |
+| rememberSecret | Secret used to verify remember tokens |
+| logger | Error logging function |
+
 
 ---
 
-## Integration with authen-service
+## Dependencies
 
-`jsonwebtoken-express` works naturally with **authen-service**.
-
-| authen-service | jsonwebtoken-express |
-|----------------|----------------------|
-| Password authentication | JWT verification |
-| Account lockout | Cookie handling |
-| Password expiration | Middleware |
-| Two-factor authentication | Access token renewal |
-| Privilege loading | Populate `res.locals` |
-| Authentication policies | Express integration |
-
-Together they provide a clean separation between authentication business logic and HTTP infrastructure.
-
+- express
+- jsonwebtoken
+ 
 ---
 
-## Security
+## Design Philosophy
 
-The middleware provides:
+This library intentionally stays small and focused.
 
-- JWT verification
-- HTTP-only cookies
-- Secure cookies
-- Configurable SameSite policy
-- Automatic access token renewal
+It **does not** include:
 
-The library intentionally **does not** implement:
+- User management
+- Login controllers
+- Database integration
+- Passport strategies
+- OAuth providers
+- Session storage
 
-- Username/password authentication
-- Account management
-- Authorization
-- OAuth / OpenID Connect
-- Session management
-- Refresh token persistence
-
-These responsibilities belong to the application layer or **authen-service**.
-
----
-
-## Use Cases
-
-`jsonwebtoken-express` is well suited for:
-
-- Express applications
-- Server-Side Rendering (SSR)
-- Traditional MVC applications
-- Cookie-based JWT authentication
-- Enterprise web applications
-- Applications using **authen-service**
-
----
-
-## Design Principles
-
-- Separation of concerns
-- Clean Architecture
-- HTTP adapter pattern
-- Dependency inversion
-- Cookie-based authentication
-- Framework-independent authentication domain
-- Minimal API surface
+Instead, it provides lightweight middleware that integrates with any authentication system capable of issuing JWTs.
 
 ---
 
@@ -745,8 +340,8 @@ Express authorization middleware for protecting authenticated routes.
 
 # The Big Picture of core-ts ecosystem
 ### HTTP / Transport Layer
-- [jsonwebtoken-express](https://www.npmjs.com/package/jsonwebtoken-express) — verify JWT cookies, renew access tokens, SSR middleware.
-- [authentication-express](https://www.npmjs.com/package/authentication-express) — login, refresh, privilege endpoints for React / Angular / Android / iOS clients.
+- [jsonwebtoken-express](https://www.npmjs.com/package/jsonwebtoken-express) — verify JWT cookies, token refresh endpoint.
+- [authentication-express](https://www.npmjs.com/package/authentication-express) — login, privilege endpoints for React / Angular / Android / iOS clients.
 - [security-express](https://www.npmjs.com/package/security-express) — route authorization and request protection.
 
 ### Authentication Domain Layer
@@ -786,7 +381,7 @@ Express authorization middleware for protecting authenticated routes.
 | **password-service**       | Password Reset / Change Service |
 | **signup-service**         | Registration Service |
 | **authentication-express** | Login Controller + Token Issuance Endpoint |
-| **jsonwebtoken-express**   | JWT Authentication Filter + Remember-Me Filter |
+| **jsonwebtoken-express**   | JWT Authentication Filter |
 | **security-express**       | Authorization Filter / Access Decision Layer |
 ---
 
@@ -840,4 +435,4 @@ That is a fundamentally different architectural philosophy.
 
 ## License
 
-MIT License.
+MIT
